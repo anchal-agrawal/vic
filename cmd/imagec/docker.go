@@ -124,9 +124,9 @@ func LearnAuthURL(options ImageCOptions) (*url.URL, error) {
 	})
 	// We expect docker registry to return a 401 to us - with a WWW-Authenticate header
 	// We parse that header and learn the OAuth endpoint to fetch OAuth token.
-	_, err = fetcher.Fetch(url)
-	if err != nil && fetcher.IsStatusUnauthorized() {
-		return fetcher.AuthURL(), nil
+	hdr, err := fetcher.Head(url)
+	if err == nil && fetcher.IsStatusUnauthorized() {
+		return fetcher.ExtractOAuthUrl(hdr.Get("www-authenticate"), url)
 	}
 
 	// Private registry returned the manifest directly as auth option is optional.
@@ -158,8 +158,10 @@ func FetchToken(url *url.URL) (*Token, error) {
 	})
 	tokenFileName, err := fetcher.Fetch(url)
 	if err != nil {
+		log.Debugf("*** FetchToken FAILED")
 		return nil, err
 	}
+	log.Debugf("*** FetchToken SUCCEEDED")
 
 	// Clenaup function
 	defer func() {
@@ -179,8 +181,10 @@ func FetchToken(url *url.URL) (*Token, error) {
 		return nil, err
 	}
 
-	if token.Expires.IsZero() {
+	if token.ExpiresIn == 0 {
 		token.Expires = time.Now().Add(DefaultTokenExpirationDuration)
+	} else {
+		token.Expires = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
 	}
 
 	return token, nil
