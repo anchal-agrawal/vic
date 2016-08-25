@@ -179,7 +179,10 @@ func (ic *ICache) getImageByNamed(named reference.Named) (*metadata.ImageConfig,
 	return copyImageConfig(config), nil
 }
 
-const DefaultDockerRegistry = "registry-1.docker.io/"
+const (
+	DefaultDockerRegistry = "registry-1.docker.io/"
+	DockerRegistryURL     = "registry.hub.docker.com/"
+)
 
 // AddImage adds an image to the image cache
 func (ic *ICache) AddImage(imageConfig *metadata.ImageConfig) {
@@ -219,7 +222,7 @@ func (ic *ICache) AddImage(imageConfig *metadata.ImageConfig) {
 
 		if tagged, ok := ref.(reference.NamedTagged); ok {
 			taggedName := fmt.Sprintf("%s:%s", tagged.Name(), tagged.Tag())
-			if imageConfig.Registry == DefaultDockerRegistry {
+			if imageConfig.Registry == DefaultDockerRegistry || imageConfig.Registry == DockerRegistryURL {
 				ic.cacheByName[taggedName] = imageConfig
 			} else {
 				// prepend the registry URL for a custom registry image

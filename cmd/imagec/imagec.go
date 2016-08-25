@@ -110,6 +110,9 @@ const (
 	// DefaultDockerURL holds the URL of Docker registry
 	DefaultDockerURL = "registry-1.docker.io"
 
+	// DockerRegistryURL holds the URL of images pulled with the full docker registry path
+	DockerRegistryURL = "registry.hub.docker.com"
+
 	// DefaultDestination specifies the default directory to use
 	DefaultDestination = "images"
 
@@ -677,7 +680,7 @@ func main() {
 	// track whether the image is from a custom registry or not
 	registryURL := fmt.Sprintf("%s/", options.registry)
 	defaultRegistry := true
-	if options.registry != DefaultDockerURL {
+	if options.registry != DefaultDockerURL && options.registry != DockerRegistryURL {
 		defaultRegistry = false
 	}
 
