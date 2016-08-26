@@ -88,6 +88,7 @@ func (ic *ICache) Update(client *client.PortLayer) error {
 	}
 
 	for _, layer := range layers.Payload {
+
 		imageConfig := &metadata.ImageConfig{}
 		if err := json.Unmarshal([]byte(layer.Metadata[metadata.MetaDataKey]), imageConfig); err != nil {
 			derr.NewErrorWithStatusCode(fmt.Errorf("Failed to unmarshal image config: %s", err),
@@ -119,6 +120,11 @@ func (ic *ICache) GetImage(idOrRef string) (*metadata.ImageConfig, error) {
 	ic.m.RLock()
 	defer ic.m.RUnlock()
 
+	// cover the case of creating by a full reference
+	if config, ok := ic.cacheByName[idOrRef]; ok {
+		return config, nil
+	}
+
 	// get the full image ID if supplied a prefix
 	if id, err := ic.idIndex.Get(idOrRef); err == nil {
 		idOrRef = id
@@ -129,6 +135,17 @@ func (ic *ICache) GetImage(idOrRef string) (*metadata.ImageConfig, error) {
 		return nil, err
 	}
 
+	/*log.Errorf("named.Name() = %s", named.Name())
+	ref1, err := reference.WithTag(ref, tag)
+	if err != nil {
+		log.Errorf("crap, error: %s", err.Error())
+	}
+	if tagged1, ok1 := ref1.(reference.NamedTagged); ok1 {
+		taggedName := tagged1.Name() + ":" + tagged1.Tag()
+		//config = ic.cacheByName[taggedName]
+		log.Errorf("taggedName is: %s", taggedName)
+	}*/
+
 	var config *metadata.ImageConfig
 	if digest != "" {
 		config, err = ic.getImageByDigest(digest)
@@ -137,6 +154,7 @@ func (ic *ICache) GetImage(idOrRef string) (*metadata.ImageConfig, error) {
 		}
 	} else {
 		config, err = ic.getImageByNamed(named)
+		//config, err = ic.cacheByName[idOrRef] // just need the tag here.
 		if err != nil {
 			return nil, err
 		}
@@ -178,6 +196,8 @@ func (ic *ICache) getImageByNamed(named reference.Named) (*metadata.ImageConfig,
 	return copyImageConfig(config), nil
 }
 
+const DefaultDockerRegistry = "registry-1.docker.io/"
+
 // AddImage adds an image to the image cache
 func (ic *ICache) AddImage(imageConfig *metadata.ImageConfig) {
 
@@ -213,13 +233,21 @@ func (ic *ICache) AddImage(imageConfig *metadata.ImageConfig) {
 			return
 		}
 
-		if tagged, ok := ref.(reference.NamedTagged); ok {
+		//if _, ok := ref.(reference.NamedTagged); ok {
+		/*if imageConfig.Registry == DefaultDockerRegistry {
 			taggedName := fmt.Sprintf("%s:%s", tagged.Name(), tagged.Tag())
 			ic.cacheByName[taggedName] = imageConfig
 		} else {
-			ic.cacheByName[ref.Name()] = imageConfig
-		}
+			// prepend the registry URL for a custom registry image
+			fullTaggedName := fmt.Sprintf("%s%s:%s", imageConfig.Registry, tagged.RemoteName(), tagged.Tag())
+			ic.cacheByName[fullTaggedName] = imageConfig
+		}*/
+		ic.cacheByName[imageConfig.Reference] = imageConfig
+		//} else {
+		//ic.cacheByName[ref.Name()] = imageConfig
+		//}
 	}
+
 }
 
 // copyImageConfig performs and returns deep copy of an ImageConfig struct
