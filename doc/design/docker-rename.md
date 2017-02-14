@@ -1,7 +1,8 @@
-<<<<<<< 03f385fa017350b420b464e0517ec6e98ceab213
 This is the design document for implementing “docker rename” on vSphere Integrated Containers Engine (VIC Engine).
 
 ## Design
+=======
+## Design Proposal
 
 ### The problem:
 
@@ -29,7 +30,7 @@ Rename involves the containerVM’s display name and the name of the datastore f
   - Backward compatibility for containers created by a VCH of an older version that does not support `docker rename`: During VCH upgrade, if an existing containerVM has `guestinfo.vice./common/name` instead of `common/name`, a data migration plugin will add `common/name` to the `ExtraConfig` of this containerVM and update the value accordingly, so that the docker operations that are supported by the old VCH still work. However, since we won't be able to update the binaries of the existing containerVMs, we disable `docker rename` on these containerVMs.
 
 ## Testing and Acceptance Criteria
-
+=======
 Robot scripts will be written to test the following:
 
 1. VM configuration:
@@ -40,6 +41,6 @@ Robot scripts will be written to test the following:
   - Check validity of network alias and HostConfig 
   - `docker-compose up` when there are existing containers for the same service but the configuration or image has been changed
   - `docker-compose up –force-recreate` when there are existing containers for the same service even if the configuration or image has not been changed
-  
+
 3. Backward compatibility
   - Add a test case in the upgrade test. Create a container using a VCH that does not support `docker rename`. After upgrading the VCH, the basic docker operations that are supported by the old VCH should work.
