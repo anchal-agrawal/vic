@@ -1,3 +1,4 @@
+<<<<<<< 03f385fa017350b420b464e0517ec6e98ceab213
 This is the design document for implementing “docker rename” on vSphere Integrated Containers Engine (VIC Engine).
 
 ## Design
