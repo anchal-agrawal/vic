@@ -44,3 +44,4 @@ Robot scripts will be written to test the following:
 
 3. Backward compatibility
   - Add a test case in the upgrade test. Create a container using a VCH that does not support `docker rename`. After upgrading the VCH, the basic docker operations that are supported by the old VCH should work.
+
