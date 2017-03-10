@@ -14,5 +14,4 @@
   * [Constraints of Using vSphere Integrated Containers Engine to Build Applications](constraints_using_vic.md)
   * [Example of Building an Application with vSphere Integrated Containers Engine](build_app_with_vic.md)
 * [Default Volume Store Error](ts_volume_store_error.md)
-* [Bridge Pool Mask Error](ts_bridge_pool_mask_error.md)
 * [Send Documentation Feedback](feedback.md)
