@@ -291,8 +291,6 @@ func Create(ctx context.Context, sess *session.Session, config *ContainerCreateC
 
 	specconfig.VMFullName = util.DisplayName(specconfig.ID, specconfig.Name)
 
-	log.Debugf("the specconfig is: %+v", specconfig)
-
 	// log only core portions
 	s := specconfig
 	log.Debugf("id: %s, name: %s, cpu: %d, mem: %d, parent: %s, os: %s, path: %s", s.ID, s.Name, s.NumCPUs, s.MemoryMB, s.ParentImageID, s.BootMediaPath, s.VMPathName)
