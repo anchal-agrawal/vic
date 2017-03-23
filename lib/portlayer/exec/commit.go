@@ -30,6 +30,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+const maxVMNameLength = 80
+
 // Commit executes the requires steps on the handle
 func Commit(ctx context.Context, sess *session.Session, h *Handle, waitTime *int32) error {
 	defer trace.End(trace.Begin(h.ExecConfig.ID))
@@ -91,7 +93,12 @@ func Commit(ctx context.Context, sess *session.Session, h *Handle, waitTime *int
 
 		// clear the spec as we've acted on it - this prevents a reconfigure from occurring in follow-on
 		// processing
-		h.Spec = nil
+
+		// h.Spec = nil
+		// reconfigure vm display name to containerName-containerShortID
+		if err = c.UpdateDisplayName(ctx, c.ExecConfig.Name); err != nil {
+			return err
+		}
 	}
 
 	// if we're stopping the VM, do so before the reconfigure to preserve the extraconfig

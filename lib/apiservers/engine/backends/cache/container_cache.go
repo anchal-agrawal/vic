@@ -15,6 +15,7 @@
 package cache
 
 import (
+	"fmt"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -98,4 +99,31 @@ func (cc *CCache) DeleteContainer(nameOrID string) {
 	if err := cc.idIndex.Delete(container.ContainerID); err != nil {
 		log.Warnf("Error deleting ID from index: %s", err)
 	}
+}
+
+func (cc *CCache) UpdateContainerName(oldName, newName string) error {
+	cc.m.Lock()
+	defer cc.m.Unlock()
+
+	// TODO this is a duplicate lookup
+	container := cc.getContainer(oldName)
+	if container == nil {
+		return fmt.Errorf("No such container: %s", oldName)
+	}
+
+	delete(cc.containersByName, container.Name)
+
+	// TODO this is also a dup!
+	if exists := cc.getContainer(newName); exists != nil {
+		err := fmt.Errorf("Conflict in container cache. The name %q is already in use by container %s.", newName, exists.ContainerID)
+		//log.Errorf("%s", err.Error()) // dup log
+		return err
+	}
+	container.Name = newName
+	cc.containersByName[newName] = container
+
+	// TODO need to update anything in containersByID? we should update the name yes
+	cc.containersByID[container.ContainerID] = container
+
+	return nil
 }

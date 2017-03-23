@@ -60,6 +60,7 @@ func (handler *ContainersHandlersImpl) Configure(api *operations.PortLayerAPI, h
 	api.ContainersContainerSignalHandler = containers.ContainerSignalHandlerFunc(handler.ContainerSignalHandler)
 	api.ContainersGetContainerLogsHandler = containers.GetContainerLogsHandlerFunc(handler.GetContainerLogsHandler)
 	api.ContainersContainerWaitHandler = containers.ContainerWaitHandlerFunc(handler.ContainerWaitHandler)
+	api.ContainersContainerRenameHandler = containers.ContainerRenameHandlerFunc(handler.RenameContainerHandler)
 
 	handler.handlerCtx = handlerCtx
 }
@@ -410,6 +411,43 @@ func (handler *ContainersHandlersImpl) ContainerWaitHandler(params containers.Co
 			Message: fmt.Sprintf("ContainerWaitHandler(%s) Error: %s", params.ID, ctx.Err()),
 		})
 	}
+}
+
+func (handler *ContainersHandlersImpl) RenameContainerHandler(params containers.ContainerRenameParams) middleware.Responder {
+	defer trace.End(trace.Begin(params.Handle))
+
+	log.Infof("The new name is: %s", params.Name)
+
+	h := exec.GetHandle(params.Handle)
+	if h == nil || h.ExecConfig == nil {
+		return containers.NewGetStateNotFound()
+	}
+
+	// get the indicated container for rename
+	container := exec.Containers.Container(h.ExecConfig.ID)
+	if container == nil {
+		return containers.NewContainerRenameNotFound()
+	}
+
+	// Rename on container version < 3 is not supported
+	if container.ExecConfig.Version == nil || container.ExecConfig.Version.PluginVersion < 3 {
+		return containers.NewContainerRenameInternalServerError().WithPayload(&models.Error{Message: fmt.Sprintf("rename is not supported on containers created by VIC Engine version < 0.9")})
+	}
+
+	// TODO can pass
+	err := container.Rename(context.Background(), handler.handlerCtx.Session, params.Name)
+	if err != nil {
+		switch err.(type) {
+		case exec.NotFoundError:
+			return containers.NewContainerRenameNotFound()
+		default:
+			return containers.NewContainerRenameInternalServerError().WithPayload(&models.Error{Message: fmt.Sprintf("")})
+		}
+	}
+
+	h.ExecConfig.ExecutorConfigCommon.Name = params.Name
+
+	return containers.NewContainerRenameNoContent()
 }
 
 // utility function to convert from a Container type to the API Model ContainerInfo (which should prob be called ContainerDetail)

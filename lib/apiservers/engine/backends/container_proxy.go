@@ -91,6 +91,7 @@ type VicContainerProxy interface {
 	Wait(vc *viccontainer.VicContainer, timeout time.Duration) (exitCode int32, processStatus string, containerState string, reterr error)
 	Signal(vc *viccontainer.VicContainer, sig uint64) error
 	Resize(vc *viccontainer.VicContainer, height, width int32) error
+	Rename(vc *viccontainer.VicContainer, newName string) error
 	AttachStreams(ctx context.Context, vc *viccontainer.VicContainer, clStdin io.ReadCloser, clStdout, clStderr io.Writer, ca *backend.ContainerAttachConfig) error
 
 	Handle(id, name string) (string, error)
@@ -568,6 +569,55 @@ func (c *ContainerProxy) State(vc *viccontainer.VicContainer) (*types.ContainerS
 		return nil, err
 	}
 	return inspectJSON.State, nil
+}
+
+func (c *ContainerProxy) Rename(vc *viccontainer.VicContainer, newName string) error {
+	defer trace.End(trace.Begin(vc.ContainerID))
+
+	var err error
+
+	//retrieve client to portlayer
+	handle, err := c.Handle(vc.ContainerID, vc.Name)
+	if err != nil {
+		return err
+	}
+
+	// Get an API client to the portlayer
+	client := PortLayerClient()
+	if client == nil {
+		err = InternalServerError("Wait failed to create a portlayer client")
+		return err
+	}
+
+	// Call the rename functionality in the portlayer.
+	_, err = client.Containers.ContainerRename(containers.NewContainerRenameParamsWithContext(ctx).WithName(newName).WithHandle(handle))
+	if err != nil {
+		switch err := err.(type) {
+		case *containers.ContainerRenameNotFound:
+			return NotFoundError(vc.Name)
+		case *containers.ContainerRenameConflict:
+			return derr.NewRequestConflictError(fmt.Errorf("ContainerName conflict in portlayer"))
+		default:
+			return InternalServerError(err.Error())
+		}
+	}
+
+	// commit handle
+	_, err = client.Containers.Commit(containers.NewCommitParamsWithContext(ctx).WithHandle(handle))
+	if err != nil {
+		switch err := err.(type) {
+		case *containers.CommitNotFound:
+			return derr.NewRequestNotFoundError(fmt.Errorf(err.Payload.Message))
+
+		case *containers.CommitDefault:
+			return derr.NewErrorWithStatusCode(fmt.Errorf(err.Payload.Message), http.StatusInternalServerError)
+
+		default:
+			return derr.NewErrorWithStatusCode(err, http.StatusInternalServerError)
+		}
+	}
+
+	return nil
 }
 
 func (c *ContainerProxy) Wait(vc *viccontainer.VicContainer, timeout time.Duration) (

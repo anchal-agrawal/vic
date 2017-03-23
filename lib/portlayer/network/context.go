@@ -759,8 +759,10 @@ func (c *Context) bindContainer(h *exec.Handle) ([]*Endpoint, error) {
 				// if the alias is not for this container, then
 				// find it in the container collection
 				if who != con.name {
-					whoc = c.containers[who]
+					whoc = c.containers[who] // TODO this needs to be updated!!
 				}
+
+				// TODO whoc needs to be non-nil
 
 				// whoc may be nil here, which means that the aliased
 				// container is not bound yet; this is OK, and will be
@@ -780,6 +782,7 @@ func (c *Context) bindContainer(h *exec.Handle) ([]*Endpoint, error) {
 				continue
 			}
 
+			// TODO this should work for the renamed container
 			log.Debugf("getting aliases for %s from %s", con.name, e.Container().Name())
 			for _, a := range e.getAliases(con.name) {
 				aliases[a.scopedName()] = con

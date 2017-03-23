@@ -35,6 +35,7 @@ import (
 	"github.com/vmware/vic/pkg/vsphere/vm"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/pkg/stringid"
 	"github.com/google/uuid"
 )
 
@@ -547,6 +548,65 @@ func (c *Container) Remove(ctx context.Context, sess *session.Session) error {
 	//remove container from cache
 	Containers.Remove(c.ExecConfig.ID)
 	publishContainerEvent(c.ExecConfig.ID, time.Now(), events.ContainerRemoved)
+
+	return nil
+}
+
+// Update the VM display name on vSphere UI
+func (c *Container) UpdateDisplayName(ctx context.Context, newName string) error {
+	defer trace.End(trace.Begin(c.ExecConfig.ID))
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	if c.vm == nil {
+		return NotFoundError{}
+	}
+
+	shortID := stringid.TruncateID(c.ExecConfig.ID)
+	nameMaxLen := maxVMNameLength - len(shortID)
+	prettyName := newName
+	if len(prettyName) > nameMaxLen-1 {
+		prettyName = prettyName[:nameMaxLen-1]
+	}
+
+	fullName := fmt.Sprintf("%s-%s", prettyName, shortID)
+	task, err := c.vm.VirtualMachine.Rename(ctx, fullName)
+	if err != nil {
+		return err
+	}
+
+	_, err = task.WaitForResult(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Rename renames a containerVM with the new name
+func (c *Container) Rename(ctx context.Context, sess *session.Session, newName string) error {
+	defer trace.End(trace.Begin(c.ExecConfig.ID))
+	log.Infof("The new name is: %s", newName)
+
+	if err := c.UpdateDisplayName(ctx, newName); err != nil {
+		return err
+	}
+	//shortID := c.ExecConfig.ID[:12]
+	//prettyName := newName
+	//c.Config.Name = fmt.Sprintf("%s-%s", prettyName, shortID)
+
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	// TODO update network config
+
+	// update vm guestinfo
+	c.ExecConfig.Name = newName
+
+	//c.ExecConfig.Networks
+	// get context, then context.containers
+
+	publishContainerEvent(c.ExecConfig.ID, time.Now(), events.ContainerRenamed)
 
 	return nil
 }
