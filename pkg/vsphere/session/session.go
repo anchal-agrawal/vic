@@ -244,30 +244,28 @@ func (s *Session) Connect(ctx context.Context) (*Session, error) {
 		}
 	}
 
-	if s.Keepalive != 0 {
-		vimClient.RoundTripper = session.KeepAliveHandler(soapClient, s.Keepalive,
-			func(roundTripper soap.RoundTripper) error {
-				cop := trace.FromOperation(op, "KeepAlive")
+	vimClient.RoundTripper = vim25.Retry(soapClient,
+		func(rTripErr error) (retry bool, delay time.Duration) {
+			cop := trace.FromOperation(op, "KeepAlive")
 
-				_, err := methods.GetCurrentTime(cop, roundTripper)
-				if err == nil {
-					return nil
+			_, err := methods.GetCurrentTime(cop, soapClient)
+			if err == nil {
+				return false, 0
+			}
+			cop.Warnf("session keepalive error: %s", err)
+
+			// If session is not auth'd, login and retry
+			if isNotAuthenticated(err) {
+				if err = login(cop); err != nil {
+					cop.Errorf("session keepalive failed to re-authenticate: %s", err)
+				} else {
+					cop.Info("session keepalive re-authenticated")
 				}
+				return true, 0
+			}
 
-				cop.Warnf("session keepalive error: %s", err)
-
-				if isNotAuthenticated(err) {
-
-					if err = login(cop); err != nil {
-						cop.Errorf("session keepalive failed to re-authenticate: %s", err)
-					} else {
-						cop.Info("session keepalive re-authenticated")
-					}
-				}
-
-				return nil
-			})
-	}
+			return false, 0
+		})
 
 	// TODO: get rid of govmomi.Client usage, only provides a few helpers we don't need.
 	s.Client = &govmomi.Client{
