@@ -20,6 +20,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/vmware/vic/pkg/log/syslog"
+	"github.com/vmware/vic/pkg/trace"
 )
 
 type LoggingConfig struct {
@@ -83,6 +84,7 @@ func Init(cfg *LoggingConfig) error {
 					logrus.Warnf("error trying to initialize syslog: %s", err)
 				} else {
 					logrus.AddHook(hook)
+					trace.Logger.Hooks.Add(hook)
 				}
 			}
 		})
