@@ -39,11 +39,6 @@ var RoleDataCenter = types.AuthorizationRole{
 	Privilege: []string{
 		"Datastore.Config",
 		"Datastore.FileManagement",
-		"VirtualMachine.Config.AddNewDisk",
-		"VirtualMachine.Config.AdvancedConfig",
-		"VirtualMachine.Config.RemoveDisk",
-		"VirtualMachine.Inventory.Create",
-		"VirtualMachine.Inventory.Delete",
 	},
 }
 

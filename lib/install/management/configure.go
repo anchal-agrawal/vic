@@ -113,7 +113,7 @@ func (d *Dispatcher) Configure(vch *vm.VirtualMachine, conf *config.VirtualConta
 
 	// If successful try to grant permissions to the ops-user
 	if err == nil && conf.ShouldGrantPerms() {
-		err = opsuser.GrantOpsUserPerms(d.op, d.session.Vim25(), conf)
+		err = opsuser.GrantOpsUserPerms(d.op, d.session, conf)
 		if err != nil {
 			// Update error message and fall through to roll back
 			err = errors.Errorf("Failed to grant permissions to ops-user, failure: %s", err)

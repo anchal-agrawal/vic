@@ -23,12 +23,11 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
+	// "time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/simulator"
@@ -43,6 +42,7 @@ import (
 	"github.com/vmware/vic/pkg/trace"
 	"github.com/vmware/vic/pkg/vsphere/rbac"
 	"github.com/vmware/vic/pkg/vsphere/session"
+	"github.com/vmware/vic/pkg/vsphere/test"
 )
 
 func init() {
@@ -988,12 +988,7 @@ func TestOpsUserPermsFromConfigSimulatorVPX(t *testing.T) {
 
 	fmt.Println(s.URL.String())
 
-	config := &session.Config{
-		Service:   s.URL.String(),
-		Insecure:  true,
-		Keepalive: time.Duration(5) * time.Minute,
-	}
-	sess, err := session.NewSession(config).Connect(ctx)
+	sess, err := test.SessionWithVPX(ctx, s.URL.String())
 	require.NoError(t, err)
 
 	input := GetVcsimInputConfig(ctx, s.URL)
@@ -1005,8 +1000,13 @@ func TestOpsUserPermsFromConfigSimulatorVPX(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, configSpec)
 
+	// Create the folder the VCH is supposed to be in, for testing that the endpoint
+	// role is applied to the folder.
+	_, err = sess.VMFolder.CreateFolder(ctx, configSpec.Name)
+	require.NoError(t, err)
+
 	// Set up the Authz Manager
-	mgr := opsuser.NewRBACManager(ctx, sess.Vim25(), nil, &opsuser.OpsuserRBACConf, configSpec)
+	mgr := opsuser.NewRBACManager(ctx, sess.Vim25(), sess, &opsuser.OpsuserRBACConf, configSpec)
 
 	resourcePermissions, err := mgr.SetupRolesAndPermissions(ctx)
 	require.NoError(t, err)

@@ -17,6 +17,7 @@ package opsuser
 import (
 	"context"
 	"net/url"
+	"path"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -65,8 +66,8 @@ func GrantDCReadOnlyPerms(ctx context.Context, session *session.Session, configS
 	return err
 }
 
-func GrantOpsUserPerms(ctx context.Context, client *vim25.Client, configSpec *config.VirtualContainerHostConfigSpec) error {
-	mgr := NewRBACManager(ctx, client, nil, &OpsuserRBACConf, configSpec)
+func GrantOpsUserPerms(ctx context.Context, session *session.Session, configSpec *config.VirtualContainerHostConfigSpec) error {
+	mgr := NewRBACManager(ctx, session.Vim25(), session, &OpsuserRBACConf, configSpec)
 	_, err := mgr.SetupRolesAndPermissions(ctx)
 	return err
 }
@@ -98,12 +99,27 @@ func (mgr *RBACManager) SetupDCReadOnlyPermissions(ctx context.Context) (*rbac.R
 	if err != nil {
 		return nil, err
 	}
+
 	// If administrator, skip setting the root permissions
 	if res {
 		log.Warnf("Cannot perform ops-user Role/Permissions initialization. The current ops-user (%s) has administrative privileges.", am.Principal)
 		log.Warnf("This occurs when \"%s\" is a member of the \"Administrators\" group or has been granted \"Admin\" role to any of the resources in the system.", am.Principal)
 		return nil, errors.Errorf("Cannot grant ops-user permissions as %s has administrative privileges", am.Principal)
 	}
+
+	dcRef := mgr.session.Datacenter.Reference()
+	hasPrivs, err := am.PrincipalHasReadOnlyPrivs(ctx, dcRef)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the ops-user already has enough privileges on the datacenter to at least
+	// satisfy the read-only role, skip setting read-only permissions.
+	if hasPrivs {
+		log.Debugf("ops-user already has enough privileges for read-only access to datacenter, skipping setting read-only permissions")
+		return nil, nil
+	}
+
 	return mgr.setupDcReadOnlyPermissions(ctx)
 }
 
@@ -184,9 +200,19 @@ func (mgr *RBACManager) setupPermissions(ctx context.Context) ([]rbac.ResourcePe
 		resourceDescs = append(resourceDescs, resourceDesc{rbac.Network, *netRef})
 	}
 
-	// Add resource pools
+	// Add the endpoint role to the resource pool(s).
 	for _, rPoolRef := range mgr.configSpec.ComputeResources {
 		resourceDescs = append(resourceDescs, resourceDesc{rbac.Endpoint, rPoolRef})
+	}
+
+	// For vCenter, apply the endpoint role to the VCH inventory folder as well.
+	if mgr.session.IsVC() {
+		vchFolderPath := path.Join(mgr.session.VMFolder.InventoryPath, mgr.configSpec.Name)
+		vchFolder, err := mgr.session.Finder.Folder(ctx, vchFolderPath)
+		if vchFolder == nil {
+			return nil, err
+		}
+		resourceDescs = append(resourceDescs, resourceDesc{rbac.Endpoint, vchFolder.Reference()})
 	}
 
 	resourcePermissions := make([]rbac.ResourcePermission, 0, len(am.Config.Resources))

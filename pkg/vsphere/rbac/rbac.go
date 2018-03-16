@@ -41,6 +41,12 @@ const (
 	Endpoint
 )
 
+const (
+	sysAnonPriv = "System.Anonymous"
+	sysReadPriv = "System.Read"
+	sysViewPriv = "System.View"
+)
+
 type NameToRef map[string]types.ManagedObjectReference
 
 type AuthzManager struct {
@@ -163,6 +169,65 @@ func (am *AuthzManager) PrincipalBelongsToGroup(ctx context.Context, group strin
 	return false, nil
 }
 
+// PrincipalHasReadOnlyPrivs returns true if the user (principal) in the AuthzManager has
+// at least a read-only role on the input ref object, false otherwise.
+func (am *AuthzManager) PrincipalHasReadOnlyPrivs(ctx context.Context, ref types.ManagedObjectReference) (bool, error) {
+	perms, err := am.GetPermissions(ctx, ref)
+	if err != nil {
+		return false, err
+	}
+
+	roles, err := am.RoleList(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	opsUser := strings.ToLower(am.Principal)
+
+	// privMap keeps track of privileges held by the opsUser on the input ref object.
+	privMap := make(map[string]struct{})
+
+	// These vars keep track of whether the corresponding privileges have been found.
+	var anon, read, view bool
+
+	for _, perm := range perms {
+		// Skip permission entries assigned to other users.
+		user := am.formatPrincipal(perm.Principal)
+		if user != opsUser {
+			continue
+		}
+
+		role := roles.ById(perm.RoleId)
+		if role == nil {
+			return false, fmt.Errorf("unable to find role %d by ID", perm.RoleId)
+		}
+
+		// Check the role for privileges that satisfy the read-only role.
+		privs := role.Privilege
+		for i := range privs {
+			privMap[privs[i]] = struct{}{}
+		}
+
+		// Set flags for individual privileges if not set already.
+		if !anon {
+			_, anon = privMap[sysAnonPriv]
+		}
+		if !read {
+			_, read = privMap[sysReadPriv]
+		}
+		if !view {
+			_, view = privMap[sysViewPriv]
+		}
+
+		if anon && read && view {
+			// The ops-user has enough privileges for the read-only role.
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (am *AuthzManager) PrincipalHasRole(ctx context.Context, roleName string) (bool, error) {
 	// Build expected representation of the ops-user
 	principal := strings.ToLower(am.Principal)
@@ -247,9 +312,9 @@ func (am *AuthzManager) AddPermission(ctx context.Context, ref types.ManagedObje
 	}
 
 	resourcePermission := &ResourcePermission{
-		Permission: permission,
-		Reference:  ref,
 		RType:      resourceType,
+		Reference:  ref,
+		Permission: permission,
 	}
 
 	return resourcePermission, nil

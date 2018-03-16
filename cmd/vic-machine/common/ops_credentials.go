@@ -51,7 +51,7 @@ func (o *OpsCredentials) Flags(hidden bool) []cli.Flag {
 		cli.GenericFlag{
 			Name:   "ops-grant-perms",
 			Value:  flags.NewOptionalBool(&o.GrantPerms),
-			Usage:  "Create roles and grant required permissions to the specified ops-use",
+			Usage:  "Create roles and grant required permissions to the specified ops-user",
 			Hidden: hidden,
 		},
 	}

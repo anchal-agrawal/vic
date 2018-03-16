@@ -190,8 +190,6 @@ func (v *Validator) VcsimValidate(ctx context.Context, localInputConfig *data.Da
 	v.CheckLicense(op)
 	v.CheckDRS(op)
 
-	// fmt.Printf("Config: %# v\n", pretty.Formatter(conf))
-
 	// Perform the higher level compatibility and consistency checks
 	v.compatibility(op, conf)
 
